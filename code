@@ -1,0 +1,95 @@
+import random
+import numpy as np
+
+# Define the Tic-Tac-Toe environment
+class TicTacToe:
+    def __init__(self):
+        self.board = [' '] * 9
+        self.current_player = 'X'
+
+    def reset(self):
+        self.board = [' '] * 9
+        self.current_player = 'X'
+        return self.get_state()
+
+    def get_state(self):
+        return ''.join(self.board)
+
+    def available_actions(self):
+        return [i for i in range(9) if self.board[i] == ' ']
+
+    def make_move(self, action):
+        if self.board[action] == ' ':
+            self.board[action] = self.current_player
+            winner = self.check_winner()
+            done = winner is not None or ' ' not in self.board
+            reward = 0
+            if winner == 'X':
+                reward = 1
+            elif winner == 'O':
+                reward = -1
+            self.current_player = 'O' if self.current_player == 'X' else 'X'
+            return self.get_state(), reward, done
+        return self.get_state(), 0, False
+
+    def check_winner(self):
+        wins = [(0,1,2),(3,4,5),(6,7,8),
+                (0,3,6),(1,4,7),(2,5,8),
+                (0,4,8),(2,4,6)]
+        for a,b,c in wins:
+            if self.board[a] == self.board[b] == self.board[c] != ' ':
+                return self.board[a]
+        return None
+
+
+# Q-Learning Agent
+class QLearningAgent:
+    def __init__(self, alpha=0.1, gamma=0.9, epsilon=0.2):
+        self.q_table = {}
+        self.alpha = alpha  # learning rate
+        self.gamma = gamma  # discount factor
+        self.epsilon = epsilon  # exploration rate
+
+    def get_q_value(self, state, action):
+        return self.q_table.get((state, action), 0.0)
+
+    def choose_action(self, state, actions):
+        if random.random() < self.epsilon:
+            return random.choice(actions)
+        q_values = [self.get_q_value(state, a) for a in actions]
+        max_q = max(q_values)
+        return actions[q_values.index(max_q)]
+
+    def learn(self, state, action, reward, next_state, done):
+        old_q = self.get_q_value(state, action)
+        future_q = 0 if done else max([self.get_q_value(next_state, a) for a in range(9)])
+        new_q = old_q + self.alpha * (reward + self.gamma * future_q - old_q)
+        self.q_table[(state, action)] = new_q
+
+
+# Training the agent
+env = TicTacToe()
+agent = QLearningAgent()
+
+episodes = 5000
+
+for episode in range(episodes):
+    state = env.reset()
+    done = False
+
+    while not done:
+        actions = env.available_actions()
+        action = agent.choose_action(state, actions)
+        next_state, reward, done = env.make_move(action)
+
+        # Random opponent (O)
+        if not done:
+            opponent_action = random.choice(env.available_actions())
+            next_state, reward, done = env.make_move(opponent_action)
+            if reward == -1:  # agent lost
+                reward = -1
+
+        agent.learn(state, action, reward, next_state, done)
+        state = next_state
+
+print("✅ Training completed! The agent has learned to play Tic-Tac-Toe.")
